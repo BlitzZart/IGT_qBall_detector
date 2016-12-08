@@ -12,10 +12,9 @@ namespace OpenCV_Balls {
         public static void Main() {
             bool hasConnection = false;
             TcpClient client = null;
-            StreamReader inStream = null;
             BinaryReader binReader = null;
             while (!hasConnection) {
-                // Verbindung zum Server aufbauen
+                // connect to server
                 try {
                     client = new TcpClient("localhost", 4711);
                 } catch {
@@ -23,14 +22,13 @@ namespace OpenCV_Balls {
                 }
 
                 if (client != null) {
-                    // Stream zum lesen holen
+                    // read stream
                     client.ReceiveBufferSize = 8;
-                    //inStream = new StreamReader(client.GetStream());
                     binReader = new BinaryReader(client.GetStream());
                     hasConnection = true;
                 }
-                Thread.Sleep(1000);
                 Console.WriteLine("Waiting for server...");
+                Thread.Sleep(1000);
             }
             Console.WriteLine("Connection established.");
             bool loop = true;
@@ -43,12 +41,11 @@ namespace OpenCV_Balls {
 
                 }
                 catch (Exception) {
-                    // Setze das Schleifen-Flag zurück
-                    // wenn ein Fehler in der Kommunikation aufgetreten ist
+                    // stop loop when error occures
                     loop = false;
                 }
             }
-            // Schließe die Verbindung zum Server
+            // close connection
             client.Close();
         }
     }
