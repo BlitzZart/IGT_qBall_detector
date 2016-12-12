@@ -3,12 +3,8 @@ using OpenCvSharp;
 using OpenCvSharp.Blob;
 using OpenCvSharp.CPlusPlus;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
-using System.Threading;
 
 
 [StructLayout(LayoutKind.Explicit)]
@@ -38,16 +34,30 @@ public struct FloatUnion {
     }
 }
 
+enum Mode
+{
+    Tracking, Live, Calibration
+}
+
 namespace OpenCVSharpLoda {
     class Program {
         // circle thresholds
-        static int minRadius = 40;
-        static int maxRadius = 70;
+        static int minRadius = 18;
+        static int maxRadius = 26;
         // cooldown = minimum time between detected circles
         static float cooldown = 1.0f;
         static float currentCool = 0;
 
-        public static bool calibrationMode = false;
+
+        static IplImage gray;
+        static IplImage srcImage;
+        static Mat bluredImageMat;
+        static InputArray bluredInputArray;
+        static CvCircleSegment[] foundCircles;
+
+
+        static Mode mode = Mode.Tracking;
+
 
         static bool foundBall = false;
 
@@ -60,13 +70,21 @@ namespace OpenCVSharpLoda {
             TCP_Server.InitServer();
 
             using (CvCapture cap = CvCapture.FromCamera(0)) {
-
                 //using (CvWindow winBin = new CvWindow("Camera Binary"))
-                using (CvWindow winScr = new CvWindow("Camera Source")) {
-                    if (calibrationMode) {
-                        Calibration(cap, winScr);
-                    } else {
-                        CircleOnly(cap, winScr);
+                using (CvWindow winSrc = new CvWindow("Camera Source")) {
+
+                    switch(mode)
+                    {
+                        case Mode.Tracking:
+                            Calibration(cap, winSrc);
+                            CircleOnly(cap, winSrc);
+                            break;
+                        case Mode.Live:
+                            Live(cap, winSrc);
+                            break;
+                        case Mode.Calibration:
+                            Calibration(cap, winSrc);
+                            break;
                     }
                 }
             }
@@ -83,21 +101,23 @@ namespace OpenCVSharpLoda {
         }
 
         static void FindCircle(IplImage src, CvWindow winScr) {
-            IplImage gray = new IplImage(src.Size, BitDepth.U8, 1);
+            gray = new IplImage(src.Size, BitDepth.U8, 1);
 
             Cv.CvtColor(src, gray, ColorConversion.RgbToGray);
-            Mat m = new Mat(gray);
 
-            m.GaussianBlur(new Size(9, 9), 2, 2);
-            InputArray ia = InputArray.Create(m);
+            bluredImageMat = new Mat(gray);
+
+            bluredImageMat.GaussianBlur(new Size(9, 9), 2, 2);
+            bluredInputArray = InputArray.Create(bluredImageMat);
             
-            CvCircleSegment[] circles = Cv2.HoughCircles(ia, HoughCirclesMethod.Gradient, 1, 100, 100, 30, minRadius, maxRadius);
+            foundCircles = Cv2.HoughCircles(bluredInputArray, HoughCirclesMethod.Gradient, 1, 90, 90, 30, minRadius, maxRadius);
 
             if (!foundBall) {
-                if (circles.Length > 0) {
+                if (foundCircles.Length > 0) {
+                    Console.WriteLine("Radius " + foundCircles[0].Radius);
                     foundBall = true;
-                    FoundIt(circles[0].Center.X, circles[0].Center.Y, m.Width, m.Height);
-                    Cv.DrawCircle(gray, circles[0].Center, 64, CvColor.Green);
+                    FoundIt(foundCircles[0].Center.X, foundCircles[0].Center.Y, bluredImageMat.Width, bluredImageMat.Height);
+                    Cv.DrawCircle(gray, foundCircles[0].Center, 64, CvColor.Green);
                 }
             }
             else {
@@ -109,10 +129,10 @@ namespace OpenCVSharpLoda {
                     currentCool += _deltaTime;
                 }
             }
-            winScr.Image = m.ToIplImage();
+            winScr.Image = gray; // m.ToIplImage();
         }
 
-        static void Calibration(CvCapture cap, CvWindow winScr) {
+        static void Live(CvCapture cap, CvWindow winScr) {
 
             while (CvWindow.WaitKey(10) != 27) {
                 IplImage src = cap.QueryFrame();
@@ -120,19 +140,27 @@ namespace OpenCVSharpLoda {
             }
         }
 
-        static void CircleOnly(CvCapture cap, CvWindow winScr) {
-            while (CvWindow.WaitKey(10) != 27) {
-                IplImage src = cap.QueryFrame();
+        static void CircleOnly(CvCapture cap, CvWindow winScr)
+        {
+            while (CvWindow.WaitKey(10) != 27)
+            {
+                srcImage =  PerspectiveCorretoin.GetCorrectedImage(cap.QueryFrame());
                 ShowFPS();
-                FindCircle(src, winScr);
+                FindCircle(srcImage, winScr);
             }
+        }
+
+        static void Calibration(CvCapture cap, CvWindow winSrc)
+        {
+            PerspectiveCorretoin.ApplyFourPointTransform(cap, winSrc);
         }
 
         private static void ShowFPS() {
             _fpsStopWatch.Stop();
             _deltaTime = _fpsStopWatch.ElapsedMilliseconds * 0.001f;
-            if (_deltaTime > 0.07f)
-                Console.WriteLine("!!! FPS < 14: " + (int)(1 / _deltaTime));
+            //Console.WriteLine("FPS : " + (int)(1 / _deltaTime));
+            //if (_deltaTime > 0.07f)
+            //    Console.WriteLine("!!! FPS < 14: " + (int)(1 / _deltaTime));
             //if (s != 0)
             //    Console.WriteLine("FPS: " + (int)(1 / s));
             _fpsStopWatch.Reset();

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -17,6 +18,9 @@ namespace OpenCV_Balls {
                 // connect to server
                 try {
                     client = new TcpClient("localhost", 4711);
+
+                    IPAddress ipAddress = Dns.GetHostEntry("www.contoso.com").AddressList[0];
+                    Console.WriteLine("IP " + ipAddress);
                 } catch {
                     Console.WriteLine("No server found...");
                 }
