@@ -51,6 +51,7 @@ namespace OpenCVSharpLoda {
 
         static IplImage gray;
         static IplImage srcImage;
+        static Size blurKernelSize;
         static Mat bluredImageMat;
         static InputArray bluredInputArray;
         static CvCircleSegment[] foundCircles;
@@ -101,15 +102,16 @@ namespace OpenCVSharpLoda {
         }
 
         static void FindCircle(IplImage src, CvWindow winScr) {
-            gray = new IplImage(src.Size, BitDepth.U8, 1);
 
             Cv.CvtColor(src, gray, ColorConversion.RgbToGray);
-
             bluredImageMat = new Mat(gray);
 
-            bluredImageMat.GaussianBlur(new Size(9, 9), 2, 2);
+            // NOTE: GC collects every loop
+            GC.Collect();
+
+            bluredImageMat.GaussianBlur(blurKernelSize, 2, 2);
             bluredInputArray = InputArray.Create(bluredImageMat);
-            
+
             foundCircles = Cv2.HoughCircles(bluredInputArray, HoughCirclesMethod.Gradient, 1, 90, 90, 30, minRadius, maxRadius);
 
             if (!foundBall) {
@@ -142,6 +144,9 @@ namespace OpenCVSharpLoda {
 
         static void CircleOnly(CvCapture cap, CvWindow winScr)
         {
+            srcImage = PerspectiveCorretoin.GetCorrectedImage(cap.QueryFrame());
+            gray = new IplImage(srcImage.Size, BitDepth.U8, 1);
+            blurKernelSize = new Size(9, 9);
             while (CvWindow.WaitKey(10) != 27)
             {
                 srcImage =  PerspectiveCorretoin.GetCorrectedImage(cap.QueryFrame());
@@ -161,8 +166,8 @@ namespace OpenCVSharpLoda {
             //Console.WriteLine("FPS : " + (int)(1 / _deltaTime));
             //if (_deltaTime > 0.07f)
             //    Console.WriteLine("!!! FPS < 14: " + (int)(1 / _deltaTime));
-            //if (s != 0)
-            //    Console.WriteLine("FPS: " + (int)(1 / s));
+            //if (_deltaTime != 0)
+            //    Console.Write("  FPS: " + (int)(1 / _deltaTime));
             _fpsStopWatch.Reset();
             _fpsStopWatch.Start();
         }
