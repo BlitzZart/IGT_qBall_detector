@@ -24,6 +24,8 @@ namespace OpenCV_Balls
         public static void ApplyFourPointTransform(CvCapture cap, CvWindow win)
         {
 
+            
+
             CvPoint2D32f[] sPts = null;
             image = cap.QueryFrame();
 
@@ -31,6 +33,7 @@ namespace OpenCV_Balls
             {
                 image = cap.QueryFrame();
                 sPts = GetPoints(image, win);
+
                 if (sPts != null)
                 {
                     calibrationDone = true;
@@ -61,57 +64,32 @@ namespace OpenCV_Balls
 
             correctionMatrix = Cv.GetPerspectiveTransform(sPts, dPts);
             Cv.WarpPerspective(image, image, correctionMatrix);
-
-            //while (CvWindow.WaitKey(10) != 27)
-            //{
-            //    image = cap.QueryFrame();
-            //    Cv.WarpPerspective(image, image, m);
-            //    win.Image = image;
-            //}
         }
 
 
+        static CvPoint2D32f center;
+        private static CvPoint2D32f[] SortPoints(CvPoint2D32f[] pts) {
+            CvPoint2D32f tl, tr, br, bl;
+            tl = tr = br = bl = pts[0];
 
-        private static CvPoint2D32f[] SortPoints(CvPoint2D32f[] ip)
-        {
+            center.X = (pts[0].X + pts[1].X + pts[2].X + pts[3].X) / 4;
+            center.Y = (pts[0].Y + pts[1].Y + pts[2].Y + pts[3].Y) / 4;
 
-            CvPoint2D32f tl, tr, br, bl;  
-
-            tl = tr = br = bl = ip[0];
-            for (int i = 0; i < 4; i++)
-            {
-                // top left
-                if (ip[i].X + ip[i].Y < tl.X + tl.Y)
-                    tl = ip[i];
-                // bottom right
-                if (ip[i].X + ip[i].Y > br.X + br.Y)
-                    br = ip[i];
-            }
-
-            for (int i = 0; i < 4; i++)
-            {
-                // top right
-                if (ip[i].X > tl.X)
-                {
-                    if (ip[i].Y < br.Y)
-                    {
-                        tr = ip[i];
-                    }
+            foreach (CvPoint2D32f item in pts) {
+                if (item.X < center.X && item.Y < center.Y) {
+                    tl = item;
+                } else if (item.X > center.X && item.Y < center.Y) {
+                    tr = item;
                 }
-                // bottom left
-                if (ip[i].X < br.X)
-                {
-                    if (ip[i].Y > tr.Y)
-                    {
-                        bl = ip[i];
-                    }
+                else if (item.X > center.X && item.Y > center.Y) {
+                    br = item;
+                }
+                else if (item.X < center.X && item.Y > center.Y) {
+                    bl = item;
                 }
             }
-
-            Console.WriteLine(ip[0] + " " + tl + " " + br + " " + bl);
 
             return new CvPoint2D32f[4] { tl, tr, br, bl };
-
         }
 
         private static CvPoint2D32f[] GetPoints(IplImage src, CvWindow win)
@@ -125,13 +103,13 @@ namespace OpenCV_Balls
             m.GaussianBlur(new Size(9, 9), 2, 2);
             InputArray ia = InputArray.Create(m);
 
-            CvCircleSegment[] circles = Cv2.HoughCircles(ia, HoughCirclesMethod.Gradient, 1, 80, 80, 30, 1, 50);
+            CvCircleSegment[] circles = Cv2.HoughCircles(ia, HoughCirclesMethod.Gradient, 1, 50, 23, 23, 5, 25);
 
 
-            //Console.WriteLine("Circles " + circles.Length);
             foreach (CvCircleSegment item in circles)
             {
-                Cv.DrawCircle(gray, item.Center, 64, CvColor.Green);
+                Cv.DrawCircle(gray, item.Center, 32, CvColor.Green);
+                //Console.WriteLine("R " + item.Radius + " x " + item.Center.X + " y " + item.Center.Y);
             }
 
             win.Image = gray;
