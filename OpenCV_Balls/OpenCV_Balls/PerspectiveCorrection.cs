@@ -11,21 +11,19 @@ namespace OpenCV_Balls
     static class PerspectiveCorretoin
     {
         public static bool calibrationDone = false;
-        private static CvMat correctionMatrix;
+        private static CvMat correctionMatrix = CvMat.Identity(3,3,MatrixType.F32C1);
 
         static IplImage image;
 
+        // returns the image corrected, based on the last calibration
         public static IplImage GetCorrectedImage(IplImage image)
         {
             Cv.WarpPerspective(image, image, correctionMatrix);
             return image;
         }
-
+        // execute a four point transform calibration
         public static void ApplyFourPointTransform(CvCapture cap, CvWindow win)
         {
-
-            
-
             CvPoint2D32f[] sPts = null;
             image = cap.QueryFrame();
 
@@ -40,7 +38,6 @@ namespace OpenCV_Balls
                     break;
                 }
             }
-
 
             CvPoint tl, tr, br, bl;
             tl = sPts[0];
@@ -65,13 +62,12 @@ namespace OpenCV_Balls
             correctionMatrix = Cv.GetPerspectiveTransform(sPts, dPts);
             Cv.WarpPerspective(image, image, correctionMatrix);
         }
-
-
-        static CvPoint2D32f center;
+        // sort 4 points clockwise and return
         private static CvPoint2D32f[] SortPoints(CvPoint2D32f[] pts) {
             CvPoint2D32f tl, tr, br, bl;
             tl = tr = br = bl = pts[0];
 
+            CvPoint2D32f center;
             center.X = (pts[0].X + pts[1].X + pts[2].X + pts[3].X) / 4;
             center.Y = (pts[0].Y + pts[1].Y + pts[2].Y + pts[3].Y) / 4;
 
@@ -91,7 +87,7 @@ namespace OpenCV_Balls
 
             return new CvPoint2D32f[4] { tl, tr, br, bl };
         }
-
+        // find and return the 4 corner markers positions
         private static CvPoint2D32f[] GetPoints(IplImage src, CvWindow win)
         {
             IplImage gray = new IplImage(src.Size, BitDepth.U8, 1);
@@ -103,13 +99,11 @@ namespace OpenCV_Balls
             m.GaussianBlur(new Size(9, 9), 2, 2);
             InputArray ia = InputArray.Create(m);
 
-            CvCircleSegment[] circles = Cv2.HoughCircles(ia, HoughCirclesMethod.Gradient, 1, 50, 23, 23, 5, 25);
-
+            CvCircleSegment[] circles = Cv2.HoughCircles(ia, HoughCirclesMethod.Gradient, 1, 50, 29, 29, 5, 25);
 
             foreach (CvCircleSegment item in circles)
             {
                 Cv.DrawCircle(gray, item.Center, 32, CvColor.Green);
-                //Console.WriteLine("R " + item.Radius + " x " + item.Center.X + " y " + item.Center.Y);
             }
 
             win.Image = gray;

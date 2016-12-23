@@ -67,18 +67,17 @@ namespace OpenCVSharpLoda {
 
         static void Main(string[] args) {
             _fpsStopWatch = new Stopwatch();
-
             TCP_Server.InitServer();
 
             using (CvCapture cap = CvCapture.FromCamera(0)) {
                 //using (CvWindow winBin = new CvWindow("Camera Binary"))
                 using (CvWindow winSrc = new CvWindow("Camera Source")) {
 
-                    switch(mode)
-                    {
+                    switch (mode) {
                         case Mode.Tracking:
                             Calibration(cap, winSrc);
-                            CircleOnly(cap, winSrc);
+                            //CircleOnly(cap, winSrc);
+                            FindBlob(cap, winSrc);
                             break;
                         case Mode.Live:
                             Live(cap, winSrc);
@@ -92,6 +91,7 @@ namespace OpenCVSharpLoda {
             TCP_Server.CloseAll();
         }
 
+        // send position of found circle/ball via tcp
         static void FoundIt(float x, float y, int width, int height) {
             float x01 = (float)x / (float)width;
             float y01 = (float)y / (float)height;
@@ -100,9 +100,8 @@ namespace OpenCVSharpLoda {
 
             TCP_Server.SendPosition(x01, y01);
         }
-
+        // search circles/balls via houghtransform
         static void FindCircle(IplImage src, CvWindow winScr) {
-
             Cv.CvtColor(src, gray, ColorConversion.RgbToGray);
             bluredImageMat = new Mat(gray);
 
@@ -114,7 +113,7 @@ namespace OpenCVSharpLoda {
 
             foundCircles = Cv2.HoughCircles(bluredInputArray, HoughCirclesMethod.Gradient, 1, 90, 90, 30, minRadius, maxRadius);
 
-            if (!foundBall) {
+            if (!foundBall || mode == Mode.Live) {
                 if (foundCircles.Length > 0) {
                     Console.WriteLine("Radius " + foundCircles[0].Radius);
                     foundBall = true;
@@ -133,116 +132,79 @@ namespace OpenCVSharpLoda {
             }
             winScr.Image = gray; // m.ToIplImage();
         }
-
-        static void Live(CvCapture cap, CvWindow winScr) {
+        // shows a live view of the current web cam
+        private static void Live(CvCapture cap, CvWindow winScr) {
 
             while (CvWindow.WaitKey(10) != 27) {
                 IplImage src = cap.QueryFrame();
                 winScr.Image = src;
             }
         }
-
-        static void CircleOnly(CvCapture cap, CvWindow winScr)
-        {
+        // use circle detection only
+        private static void CircleOnly(CvCapture cap, CvWindow winScr) {
             srcImage = PerspectiveCorretoin.GetCorrectedImage(cap.QueryFrame());
             gray = new IplImage(srcImage.Size, BitDepth.U8, 1);
             blurKernelSize = new Size(9, 9);
-            while (CvWindow.WaitKey(10) != 27)
-            {
-                srcImage =  PerspectiveCorretoin.GetCorrectedImage(cap.QueryFrame());
+            while (CvWindow.WaitKey(10) != 27) {
+                srcImage = PerspectiveCorretoin.GetCorrectedImage(cap.QueryFrame());
                 ShowFPS();
                 FindCircle(srcImage, winScr);
             }
         }
-
-        static void Calibration(CvCapture cap, CvWindow winSrc)
-        {
+        // execute perspective correction
+        private static void Calibration(CvCapture cap, CvWindow winSrc) {
             PerspectiveCorretoin.ApplyFourPointTransform(cap, winSrc);
         }
-
+        // print FPS in console
         private static void ShowFPS() {
             _fpsStopWatch.Stop();
             _deltaTime = _fpsStopWatch.ElapsedMilliseconds * 0.001f;
             //Console.WriteLine("FPS : " + (int)(1 / _deltaTime));
-            //if (_deltaTime > 0.07f)
-            //    Console.WriteLine("!!! FPS < 14: " + (int)(1 / _deltaTime));
+            if (_deltaTime > 0.07f)
+                Console.WriteLine("!!! FPS < 14: " + (int)(1 / _deltaTime));
             //if (_deltaTime != 0)
             //    Console.Write("  FPS: " + (int)(1 / _deltaTime));
             _fpsStopWatch.Reset();
             _fpsStopWatch.Start();
         }
+        // find circles/dots using blob detection
+        static void FindBlob(CvCapture cap, CvWindow winScr) {
+            SimpleBlobDetector.Params blobParameters = new SimpleBlobDetector.Params();
+
+            // threshold (gray value)
+            blobParameters.MinThreshold = 100;
+            blobParameters.MaxThreshold = 255;
+            // area (pixel cound)
+            blobParameters.FilterByArea = true;
+            blobParameters.MinArea = 100;
+            blobParameters.MaxArea = 200;
+            // circularity
+            blobParameters.FilterByCircularity = true;
+            blobParameters.MinCircularity = 0.87f;
+            // convexity - probably not needed - maybe eleminates false positives
+            blobParameters.FilterByConvexity = true;
+            blobParameters.MinConvexity = 0.5f;
+            //// inertia - what does the values mean exactly
+            //blobParameters.FilterByInertia = true;
+            //blobParameters.MinInertiaRatio = 
+
+            SimpleBlobDetector blobDetector = new SimpleBlobDetector(blobParameters);
+            gray = new IplImage(cap.QueryFrame().Size, BitDepth.U8, 1);
+
+            while (CvWindow.WaitKey(10) != 27) {
+                IplImage iplImage = PerspectiveCorretoin.GetCorrectedImage(cap.QueryFrame());
+                Cv.CvtColor(iplImage, gray, ColorConversion.RgbToGray);
+
+                Mat mat = new Mat(gray);
+                mat.PyrDown(new Size(mat.Width/2, mat.Height/2));
+
+                KeyPoint[] keypoints = blobDetector.Detect(mat);
+
+                foreach (KeyPoint item in keypoints) {
+                    Cv.DrawCircle(gray, new CvPoint2D32f(item.Pt.X, item.Pt.Y), (int)(item.Size * 3), CvColor.Green);
+                }
+                winScr.Image = gray;
+            }
+        }
     }
 }
-
-//static void BlobAndCircleCombined(CvCapture cap, CvWindow winScr, CvWindow winBin) {
-//    CvBlob blob = new CvBlob();
-//    CvBlobs blobs = new CvBlobs();
-//    while (CvWindow.WaitKey(10) != 27) {
-//        ShowFPS();
-
-//        IplImage src = cap.QueryFrame();
-//        IplImage binary = new IplImage(src.Size, BitDepth.U8, 1);
-
-//        Cv.CvtColor(src, binary, ColorConversion.BgrToGray);
-//        Cv.Threshold(binary, binary, 100, 120, ThresholdType.BinaryInv); // TODO: change to BinaryInv!!!!!
-
-//        blobs.Clear();
-//        blobs.Label(binary);
-//        blob = blobs.LargestBlob();
-
-//        FindCircle(src, winScr, 0, 0);
-
-//        if (blob != null && blobs.Count > 0) {
-//            if (blob.Area > minArea && blob.Area < maxArea) {
-//                Cv.DrawCircle(src, blob.Centroid, 64, CvColor.Green);
-//                // Console.WriteLine(blob.Area);
-//                if (!foundBall) {
-//                    foundBall = true;
-//                    //FindCircle(src, winScr, blob.Centroid.X, blob.Centroid.Y);
-//                    FoundIt((int)blob.Centroid.X, (int)blob.Centroid.Y, binary.Width, binary.Height);
-//                }
-//            }
-//            else {
-//                foundBall = false;
-//            }
-//        }
-//        else {
-//            foundBall = false;
-//        }
-
-//        //blobs.RenderBlobs(binary, src);
-//        //winScr.Image = src;
-//        winBin.Image = binary;
-//    }
-
-//}
-
-//static void DoSome(Mat mat) {
-
-//    MatOfByte mat1 = new MatOfByte(mat);
-//    var indexer = mat1.GetIndexer();
-
-//    for (int y = 0; y < mat.Height; y++) {
-//        for (int x = 0; x < mat.Width; x++) {
-//            byte val = indexer[y, x];
-
-//            //val = (byte)(255 - val);
-
-//            val = (byte)(Threshold(Clamp(255 - val, 0, 255), 90));
-//            if (val > 100)
-//                val = 255;
-
-//            indexer[y, x] = val;
-//        }
-//    }
-//}
-
-//public static int GainAndClamp(int value, int min, int max, float gain) {
-//    return (value < min) ? min : (value > max) ? max : (int)(value * gain);
-//}
-//public static int Clamp(int value, int min, int max) {
-//    return (value < min) ? min : (value > max) ? max : value;
-//}
-//public static int Threshold(int value, int threshold) {
-//    return (value > threshold) ? value : 0;
-//}
