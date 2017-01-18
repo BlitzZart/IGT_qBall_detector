@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using OpenCvSharp;
 using OpenCvSharp.CPlusPlus;
 
@@ -10,6 +6,13 @@ namespace OpenCV_Balls
 {
     static class PerspectiveCorretoin
     {
+        public static double calDP = 1;
+        public static double calMinDist = 100;
+        public static double calP1 = 70;
+        public static double calP2 = 29;
+        public static int calMinRadius = 9;
+        public static int calMaxRadius = 15;
+
         public static bool calibrationDone = false;
         private static CvMat correctionMatrix = CvMat.Identity(3,3,MatrixType.F32C1);
 
@@ -24,6 +27,7 @@ namespace OpenCV_Balls
         // execute a four point transform calibration
         public static void ApplyFourPointTransform(CvCapture cap, CvWindow win)
         {
+            Console.WriteLine("******* Starting Calibration *******");
             CvPoint2D32f[] sPts = null;
             image = cap.QueryFrame();
 
@@ -35,6 +39,7 @@ namespace OpenCV_Balls
                 if (sPts != null)
                 {
                     calibrationDone = true;
+                    Console.WriteLine("********* Calibration DONE *********\n");
                     break;
                 }
             }
@@ -99,7 +104,7 @@ namespace OpenCV_Balls
             m.GaussianBlur(new Size(9, 9), 2, 2);
             InputArray ia = InputArray.Create(m);
 
-            CvCircleSegment[] circles = Cv2.HoughCircles(ia, HoughCirclesMethod.Gradient, 1, 50, 29, 29, 5, 25);
+            CvCircleSegment[] circles = Cv2.HoughCircles(ia, HoughCirclesMethod.Gradient, calDP, calMinDist, calP1, calP2, calMinRadius, calMaxRadius);
 
             foreach (CvCircleSegment item in circles)
             {
@@ -110,13 +115,12 @@ namespace OpenCV_Balls
 
             if (circles.Length > 3)
             {
-                Console.WriteLine("Calibration DONE");
                 Cv.DrawCircle(gray, circles[0].Center, 64, CvColor.Green);
-
 
                 CvPoint2D32f[] pts = new CvPoint2D32f[4];
                 for (int i = 0; i < 4; i++)
                 {
+                    Console.WriteLine("Point " + i + " | radius = " + circles[i].Radius);
                     pts[i] = new CvPoint2D32f(circles[i].Center.X, circles[i].Center.Y);
                 }
 

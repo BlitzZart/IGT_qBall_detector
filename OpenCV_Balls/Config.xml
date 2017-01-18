@@ -1,0 +1,6 @@
+<RenderClientConfig>
+  <!--  Fill server ip adress here. Use "" (empty) for predefined ip. -->
+  <minRadius>999</minRadius>
+  <!--  Fill projection mode here. "Floor" or "Wall" -->
+  <maxRadius>9999</maxRadius>
+</RenderClientConfig>
