@@ -4,6 +4,7 @@ using OpenCvSharp.Blob;
 using OpenCvSharp.CPlusPlus;
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Xml;
@@ -104,7 +105,7 @@ namespace OpenCVSharpQBalls {
                                 trackingType = TrackingType.Cirle;
                             break;
                         case "cooldown":
-                            cooldown = float.Parse(node.InnerText);
+                            cooldown = float.Parse(node.InnerText, System.Globalization.NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
                             break;
 
                         // CIRCLE
@@ -142,10 +143,10 @@ namespace OpenCVSharpQBalls {
                             blobMaxArea = float.Parse(node.InnerText);
                             break;
                         case "blobMinCircularity":
-                            blobMinCircularity = float.Parse(node.InnerText);
+                            blobMinCircularity = float.Parse(node.InnerText, System.Globalization.NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
                             break;
                         case "blobMinConvexity":
-                            blobMinConvexity = float.Parse(node.InnerText);
+                            blobMinConvexity = float.Parse(node.InnerText, System.Globalization.NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
                             break;
 
                         // CALIBRATION
@@ -208,7 +209,7 @@ namespace OpenCVSharpQBalls {
 
             TCP_Server.InitServer();
 
-            using (CvCapture cap = CvCapture.FromCamera(0)) {
+            using (CvCapture cap = CvCapture.FromCamera(1)) {
                 //using (CvWindow winBin = new CvWindow("Camera Binary"))
                 using (CvWindow winSrc = new CvWindow("Camera Source")) {
 
